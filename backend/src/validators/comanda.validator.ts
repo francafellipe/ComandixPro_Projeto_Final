@@ -71,8 +71,8 @@ export const processarPagamentoComandaSchema = comandaIdParamsSchema.merge(proce
 // Schema para query params da listagem de comandas (GET /api/comandas)
 export const listarComandasQuerySchema = z.object({
   query: z.object({
-    status: z.enum([ComandaStatus.ABERTA, ComandaStatus.FECHADA, ComandaStatus.PAGA, ComandaStatus.CANCELADA, "aberta", "fechada", "paga", "cancelada", "aguardando_pagamento"],{
-      invalid_type_error: `Status inválido. Valores permitidos: ${Object.values(ComandaStatus).join(', ')}.`
+    status: z.enum(['ABERTA', 'FECHADA', 'PAGA', 'CANCELADA', 'Aberta', 'Fechada', 'Paga', 'Cancelada', 'aberta', 'fechada', 'paga', 'cancelada', 'aguardando_pagamento'],{
+      invalid_type_error: `Status inválido. Valores permitidos: ABERTA, FECHADA, PAGA, CANCELADA.`
     }).optional(),
     mesa: z.string().max(50).optional(),
     dataInicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: "Formato de dataInicio inválido. Use YYYY-MM-DD."}).optional(),
@@ -86,4 +86,14 @@ export const listarComandasQuerySchema = z.object({
 });
 
 
-export const removerItemComandaParamsSchema = comandaIdParamsSchema.merge(itemComandaIdParamsSchema);
+export const removerItemComandaParamsSchema = z.object({
+  params: z.object({
+    comandaId: z.string()
+      .refine((val) => /^\d+$/.test(val), { message: "ID da comanda deve ser um número inteiro positivo." })
+      .transform((val) => parseInt(val, 10)),
+      
+    itemComandaId: z.string()
+      .refine((val) => /^\d+$/.test(val), { message: "ID do item da comanda deve ser um número inteiro positivo." })
+      .transform((val) => parseInt(val, 10)),
+  }),
+});

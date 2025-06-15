@@ -8,6 +8,7 @@ import Usuario from '../models/usuario.schema';
 // import Empresa from '../models/empresa.schema'; // Importe se for usar diretamente Empresa aqui
 import AppError from '../utils/appError';
 import { Op } from 'sequelize';
+import { normalizeComandaStatus } from '../utils/helper';
 
 // DTO para criar uma nova comanda
 export interface CriarComandaDTO {
@@ -23,7 +24,7 @@ export interface AdicionarItemComandaDTO {
 }
 // Interface para filtros de listagem de comandas
 export interface ListarComandasFiltrosDTO {
-    status?: ComandaStatus;
+    status?: string; // Aceita string para maior flexibilidade na validação
     mesa?: string;
     dataInicio?: string; // Formato YYYY-MM-DD
     dataFim?: string;    // Formato YYYY-MM-DD
@@ -32,7 +33,11 @@ export interface ListarComandasFiltrosDTO {
 export interface ProcessarPagamentoDTO {
     formaPagamento: FormaPagamento;
     // Outros campos como valorPago (se permitir pagamento parcial/troco) podem ser adicionados no futuro.
-  }
+}
+
+export interface AtualizarItemComandaDTO {
+    quantidade: number;
+}
 
 class ComandaService {
     /**
@@ -157,7 +162,9 @@ class ComandaService {
                     {
                         model: ItemComanda,
                         as: 'itensComanda',
-                        include: [{ model: Product, as: 'produto', attributes: ['id', 'nome'] }]
+                        include: [{ model: Product, as: 'produto', attributes: ['id', 'nome'] }],
+                        separate: true,
+                        order:[['createdAt', 'DESC']]
                     },
                     { model: Usuario, as: 'usuarioAbertura', attributes: ['id', 'nome'] },
                     { model: Caixa, as: 'caixa' }
@@ -175,7 +182,13 @@ class ComandaService {
         try {
             const whereConditions: any = { empresaId };
             if (filtros?.status) {
-                whereConditions.status = filtros.status;
+                const statusNormalizado = normalizeComandaStatus(filtros.status);
+                if (statusNormalizado) {
+                    whereConditions.status = statusNormalizado;
+                } else {
+                    // Se não for um status válido, usar o valor original
+                    whereConditions.status = filtros.status;
+                }
             }
             if (filtros?.mesa) {
                 whereConditions.mesa = filtros.mesa;
@@ -193,15 +206,15 @@ class ComandaService {
             const comandas = await Comanda.findAll({
                 where: whereConditions,
                 include: [
-                    { 
-                        model: Usuario, 
-                        as: 'usuarioAbertura', 
-                        attributes: ['id', 'nome'] 
+                    {
+                        model: Usuario,
+                        as: 'usuarioAbertura',
+                        attributes: ['id', 'nome']
                     }
                 ],
                 order: [['dataAbertura', 'DESC']],
                 attributes: [
-                    'id', 'empresaId', 'mesa', 'nomeCliente', 'status', 
+                    'id', 'empresaId', 'mesa', 'nomeCliente', 'status',
                     'totalComanda', 'dataAbertura', 'dataFechamento', 'formaPagamento'
                 ]
             });
@@ -210,6 +223,75 @@ class ComandaService {
             console.error(`Erro ao listar comandas para empresa ${empresaId}:`, error);
             const errorMessage = error instanceof Error ? error.message : 'Detalhes do erro não disponíveis.';
             throw new AppError(`Falha ao buscar lista de comandas: ${errorMessage}`, 500);
+        }
+    }
+
+    /**
+     * Atualiza a quantidade de um item em uma comanda e recalcula os totais.
+     */
+    public static async atualizarItemComanda(
+        empresaId: number,
+        comandaId: number,
+        itemComandaId: number,
+        dadosAtualizacao: AtualizarItemComandaDTO
+    ): Promise<Comanda> {
+        const { quantidade } = dadosAtualizacao;
+
+        if (typeof quantidade !== 'number' || quantidade <= 0) {
+            throw new AppError('A quantidade deve ser um número maior que zero.', 400);
+        }
+
+        const transaction = await sequelize.transaction();
+        try {
+            const comanda = await Comanda.findOne({
+                where: { id: comandaId, empresaId, status: ComandaStatus.ABERTA },
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            });
+
+            if (!comanda) {
+                await transaction.rollback();
+                throw new AppError('Comanda não encontrada, não pertence à empresa ou não está aberta.', 404);
+            }
+
+            const itemParaAtualizar = await ItemComanda.findOne({
+                where: { id: itemComandaId, comandaId: comanda.id },
+                transaction,
+            });
+
+            if (!itemParaAtualizar) {
+                await transaction.rollback();
+                throw new AppError('Item não encontrado nesta comanda.', 404);
+            }
+
+            // Guarda o subtotal antigo para recalcular o total da comanda
+            const subtotalAntigo = Number(itemParaAtualizar.subtotal);
+
+            // Atualiza o item
+            itemParaAtualizar.quantidade = quantidade;
+            itemParaAtualizar.subtotal = Number(itemParaAtualizar.precoUnitarioCobrado) * quantidade;
+            await itemParaAtualizar.save({ transaction });
+
+            // Recalcula o total da comanda
+            const novoSubtotal = Number(itemParaAtualizar.subtotal);
+            comanda.totalComanda = Number(comanda.totalComanda) - subtotalAntigo + novoSubtotal;
+            await comanda.save({ transaction });
+
+            await transaction.commit();
+
+            // Rebusca a comanda para retornar o estado mais recente com todas as inclusões
+            const comandaAtualizada = await this.visualizarComanda(empresaId, comandaId);
+            if (!comandaAtualizada) {
+                throw new AppError('Erro ao buscar dados da comanda após atualização.', 500);
+            }
+            return comandaAtualizada;
+
+        } catch (error: any) {
+            await transaction.rollback();
+            if (error instanceof AppError) throw error;
+            console.error(`Erro ao atualizar item ${itemComandaId} da comanda ${comandaId}:`, error);
+            const errorMessage = error instanceof Error ? error.message : 'Detalhes do erro não disponíveis.';
+            throw new AppError(`Falha ao atualizar item da comanda: ${errorMessage}`, 500);
         }
     }
 

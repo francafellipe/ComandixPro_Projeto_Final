@@ -8,10 +8,10 @@ import ItemComanda from './itemComanda.schema';
 
 
 export enum ComandaStatus {
-  ABERTA = 'Aberta',
-  FECHADA = 'Fechada', // Aguardando pagamento ou processamento final
-  PAGA = 'Paga',
-  CANCELADA = 'Cancelada',
+  ABERTA = 'ABERTA',
+  FECHADA = 'FECHADA', // Aguardando pagamento ou processamento final
+  PAGA = 'PAGA',
+  CANCELADA = 'CANCELADA',
 }
 
 export enum FormaPagamento {

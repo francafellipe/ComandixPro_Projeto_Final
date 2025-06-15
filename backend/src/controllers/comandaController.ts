@@ -1,8 +1,9 @@
 // src/controllers/comandaController.ts
-import {Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import ComandaService, {
     CriarComandaDTO,
     AdicionarItemComandaDTO,
+    AtualizarItemComandaDTO,
     ListarComandasFiltrosDTO,
     ProcessarPagamentoDTO
 } from '../services/comandaService';
@@ -35,7 +36,7 @@ class ComandaController {
     /**
      * Adiciona um item a uma comanda existente.
      */
-    public static async adicionarItemComanda(req:  Request, res: Response, next: NextFunction): Promise<void> {
+    public static async adicionarItemComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null) {
                 throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
@@ -61,7 +62,7 @@ class ComandaController {
     /**
      * Visualiza uma comanda específica.
      */
-    public static async visualizarComanda(req:  Request, res: Response, next: NextFunction): Promise<void> {
+    public static async visualizarComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null) {
                 throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
@@ -86,7 +87,7 @@ class ComandaController {
      * Lista as comandas da empresa, com filtros opcionais via query params.
      * Ex: /api/comandas?status=Aberta&mesa=10
      */
-    public static async listarComandas(req:  Request, res: Response, next: NextFunction): Promise<void> {
+    public static async listarComandas(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null) {
                 throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
@@ -109,6 +110,13 @@ class ComandaController {
                 filtros.dataFim = req.query.dataFim;
             }
 
+            const { status, mesa, dataInicio, dataFim } = req.query as {
+                status?: string;
+                mesa?: string;
+                dataInicio?: string;
+                dataFim?: string;
+            };
+
 
             const comandas = await ComandaService.listarComandas(empresaId, filtros);
             res.status(200).json(comandas);
@@ -117,16 +125,47 @@ class ComandaController {
         }
     }
     /**
+     * Atualiza a quantidade de um item em uma comanda.
+     */
+    public static async atualizarItemComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+        try {
+            if (!req.user || req.user.empresaId === undefined) {
+                throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
+            }
+
+            const empresaId = req.user.empresaId;
+            const comandaId = parseInt(req.params.comandaId, 10);
+            const itemComandaId = parseInt(req.params.itemComandaId, 10);
+            const { quantidade } = req.body as AtualizarItemComandaDTO;
+
+            if (isNaN(comandaId) || isNaN(itemComandaId)) {
+                throw new AppError('ID da comanda ou do item inválido.', 400);
+            }
+
+            const comandaAtualizada = await ComandaService.atualizarItemComanda(
+                empresaId,
+                comandaId,
+                itemComandaId,
+                { quantidade }
+            );
+
+            res.status(200).json({ message: 'Item atualizado com sucesso.', comanda: comandaAtualizada });
+
+        } catch (error) {
+            next(error);
+        }
+    }
+    /**
      * Remove um item de uma comanda.
      */
-    public static async removerItemComanda(req:  Request, res: Response, next: NextFunction): Promise<void> {
+    public static async removerItemComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null) {
                 throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
             }
             const empresaId = req.user.empresaId;
             const comandaId = parseInt(req.params.comandaId, 10);
-            const itemComandaId = parseInt(req.params.itemComandaId, 10); // ID do item da comanda
+            const itemComandaId = parseInt(req.params.itemComandaId, 10);
 
             if (isNaN(comandaId) || isNaN(itemComandaId)) {
                 throw new AppError('ID da comanda ou do item da comanda inválido.', 400);
@@ -141,7 +180,7 @@ class ComandaController {
     /**
    * Cancela uma comanda específica.
    */
-    public static async cancelarComanda(req:  Request, res: Response, next: NextFunction): Promise<void> {
+    public static async cancelarComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null) {
                 throw new AppError('Informações da empresa não encontradas na autenticação.', 403);
@@ -172,7 +211,7 @@ class ComandaController {
     /**
    * Processa o pagamento de uma comanda.
    */
-    public static async processarPagamentoComanda(req:  AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+    public static async processarPagamentoComanda(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
         try {
             if (!req.user || req.user.empresaId === undefined || req.user.empresaId === null || !req.user.userId) {
                 throw new AppError('Informações da empresa ou do usuário não encontradas na autenticação.', 403);

@@ -80,9 +80,9 @@ class CaixaService {
                     {
                         model: MovimentacaoCaixa,
                         as: 'movimentacoes',
-                        attributes: ['id', 'tipo', 'valor', 'observacao', 'criadoEm'],
+                        attributes: ['id', 'tipo', 'valor', 'observacao', 'createdAt'],
                         limit: 10,
-                        order: [['criadoEm', 'DESC']]
+                        order: [['createdAt', 'DESC']]
                     }
                 ]
             });

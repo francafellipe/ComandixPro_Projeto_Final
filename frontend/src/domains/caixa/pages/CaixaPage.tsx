@@ -19,7 +19,7 @@ import { AbrirCaixaModal } from '@/components/modals/AbrirCaixaModal';
 import { MovimentacaoCaixaModal } from '@/components/modals/MovimentacaoCaixaModal';
 
 interface CaixaStatus {
-  caixaAberto: boolean;
+  status: 'aberto' | 'fechado';
   caixa?: {
     id: number;
     dataAbertura: string;
@@ -32,7 +32,7 @@ interface CaixaStatus {
     status: string;
     observacoesAbertura?: string;
   };
-  movimentacoes: Array<{
+  movimentacoes?: Array<{
     id: number;
     tipo: string;
     valor: number;
@@ -43,7 +43,7 @@ interface CaixaStatus {
 
 const fetchCaixaStatus = async (): Promise<CaixaStatus> => {
   const { data } = await apiClient.get('/caixa/status');
-  return data.data;
+  return data;
 };
 
 const fecharCaixa = async (dados: { saldoFinalInformado: number; observacoesFechamento?: string }) => {
@@ -126,7 +126,7 @@ export default function CaixaPage() {
     );
   }
 
-  if (!caixaStatus?.caixaAberto) {
+  if (caixaStatus?.status !== 'aberto') {
     return (
       <div className="space-y-6 p-4">
         <Card>

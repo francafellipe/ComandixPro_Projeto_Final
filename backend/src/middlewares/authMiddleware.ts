@@ -50,6 +50,7 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
       id: decoded.userId,
       empresaId: decoded.empresaId ?? undefined,
       role: decoded.role as UserRole, // Garantindo que o role seja do tipo UserRole
+      userId: decoded.userId, // userId recebe o mesmo valor de id
     };
 
     next();

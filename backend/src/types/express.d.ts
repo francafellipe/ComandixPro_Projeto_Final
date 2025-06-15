@@ -8,6 +8,7 @@ declare global {
         id: number;
         role: UserRole;
         empresaId?: number;
+        userId: number;
       };
       empresaVerificada?: Empresa;
     }

@@ -6,7 +6,7 @@ export interface AuthenticatedUser {
     id: number; // ID do usuário
     role: UserRole;
     empresaId?: number; // Pode ser undefined se for ADMIN_GLOBAL
-    userId?: number;    // Se você estiver usando userId separado, defina aqui
+    userId: number;    // userId sempre igual ao id
 }
 
 export interface AuthenticatedRequest extends Request {
@@ -19,6 +19,7 @@ declare module 'express-serve-static-core' {
             id: number;
             empresaId?: number;
             role: UserRole;
+            userId: number;
         }
     }
 }
